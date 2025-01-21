@@ -146,6 +146,7 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 def _verilator_hdl_test_impl(ctx):
     output_dir = ctx.actions.declare_directory(ctx.attr.name + "_verilated")
     output_exe = ctx.actions.declare_file(ctx.attr.name)
+    test_log = ctx.actions.declare_file(ctx.attr.name + ".log")
     
     # Create a script to handle the Verilator compilation process
     verilate_action = ctx.actions.declare_file(ctx.attr.name + "_verilate.sh")
@@ -157,11 +158,13 @@ set -ex
 echo "Current directory: $(pwd)"
 echo "Output directory: {output_dir}"
 echo "Output executable: {exe}"
+echo "Test log: {test_log}"
 
 # Convert relative paths to absolute
 WORKSPACE_ROOT=$(pwd)
 OUTPUT_DIR="$WORKSPACE_ROOT/{output_dir}"
 OUTPUT_EXE="$WORKSPACE_ROOT/{exe}"
+TEST_LOG="$WORKSPACE_ROOT/{test_log}"
 
 mkdir -p "$OUTPUT_DIR"
 cp {input} "$OUTPUT_DIR"/
@@ -240,11 +243,24 @@ echo "Final output: $(ls -la "$OUTPUT_EXE")"
 # Test the executable
 echo "Testing executable..."
 ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
+
+# Run the test and capture output
+echo "Running test..."
+"$OUTPUT_EXE" 2>&1 | tee "$TEST_LOG"
+test_exit=\${PIPESTATUS[0]}
+
+# Print test log
+echo "=== Test Log ==="
+cat "$TEST_LOG"
+echo "=== End Test Log ==="
+
+exit $test_exit
 '''.format(
             input = ctx.file.src.path,
             testbench = ctx.file.testbench.path,
             output_dir = output_dir.path,
             exe = output_exe.path,
+            test_log = test_log.path,
             input_name = ctx.file.src.basename,
             testbench_name = ctx.file.testbench.basename,
             top_name = ctx.attr.top_module if ctx.attr.top_module else ctx.file.src.basename.replace(".sv", ""),
@@ -254,7 +270,7 @@ ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
     
     # Run the compilation script
     ctx.actions.run(
-        outputs = [output_dir, output_exe],
+        outputs = [output_dir, output_exe, test_log],
         inputs = [ctx.file.src, ctx.file.testbench],
         tools = [verilate_action],
         executable = verilate_action,
@@ -266,7 +282,7 @@ ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
         DefaultInfo(
             files = depset([output_dir]),
             executable = output_exe,
-            runfiles = ctx.runfiles(files = [output_exe]),
+            runfiles = ctx.runfiles(files = [output_exe, test_log]),
         ),
         CcInfo(
             compilation_context = cc_common.create_compilation_context(
