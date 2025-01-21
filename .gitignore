@@ -1,53 +1,31 @@
-# Prerequisites
-*.d
+# Bazel build directories and symlinks
+/bazel-*
 
-# Compiled Object files
-*.slo
-*.lo
+# Build artifacts
+*.a
 *.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
 *.so
 *.dylib
-*.dll
 
-# Fortran module files
-*.mod
-*.smod
+# Generated BUILD files in test directories
+/test/rtl/BUILD
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# Verilator generated files
+*.d
+*.dat
+*.vcd
+obj_dir/
+*.cpp
+*.h
+!src/*.cpp
+!src/*.hpp
 
-# Executables
-*.exe
-*.out
-*.app
-
-# Build directories
-build/
-bin/
-bazel-*
-
-# IDE specific files
+# OS specific files
+.DS_Store
 .vscode/
-.idea/
 *.swp
-*.swo
+*~
 
-# Test directory
-test/
-
-# Bazel specific
-WORKSPACE
-WORKSPACE.bazel
-*.bazelrc
-*.bazelversion
-BUILD
+# Project specific
+/test/rtl/*.sv
+!test/rtl/examples/

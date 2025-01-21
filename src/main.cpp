@@ -3,6 +3,8 @@
 #include <string>
 #include <algorithm>
 #include <filesystem>
+#include <cstdlib>
+#include <cstdio>
 #include "BuildGenerator.hpp"
 
 void printUsage() {
@@ -20,6 +22,12 @@ bool hasValidExtension(const std::string& filename) {
         return false;
     }
     return filename.substr(filename.length() - extension.length()) == extension;
+}
+
+// Execute a shell command and return its exit code
+int executeCommand(const std::string& command) {
+    std::cout << "Executing: " << command << "\n";
+    return std::system(command.c_str());
 }
 
 void buildFiles(const std::vector<std::string>& files, const std::optional<std::string>& test_file = std::nullopt) {
@@ -46,6 +54,8 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
         return;
     }
 
+    std::vector<std::string> bazel_targets;
+
     // Process each file and generate BUILD files
     for (const auto& file : files) {
         try {
@@ -58,7 +68,7 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
             std::optional<std::filesystem::path> test_path = 
                 test_file ? std::make_optional(std::filesystem::absolute(*test_file)) : std::nullopt;
             
-            BuildGenerator<std::filesystem::path> generator(file_path, test_path);
+            BuildGenerator generator(file_path, test_path);
             generator.generateBuildFile(build_path.string());
             
             std::cout << "Created BUILD file at: " << build_path << "\n";
@@ -71,9 +81,38 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
                     std::cout << "  - " << submodule << "\n";
                 }
             }
+
+            // Add Bazel target for this file
+            std::string module_name = file_path.stem().string();
+            std::string target_path = std::filesystem::relative(dir_path).string();
+            std::string bazel_target = "//" + target_path + ":" + module_name + "_verilated";
+            bazel_targets.push_back(bazel_target);
+
+            // If test file is provided, add test target
+            if (test_file) {
+                std::string test_target = "//" + target_path + ":" + module_name + "_test";
+                bazel_targets.push_back(test_target);
+            }
+
         } catch (const std::exception& e) {
             std::cerr << "Error processing file '" << file << "': " << e.what() << "\n";
+            return;
         }
+    }
+
+    // Build all targets with Bazel
+    if (!bazel_targets.empty()) {
+        std::string bazel_command = "bazel build";
+        for (const auto& target : bazel_targets) {
+            bazel_command += " " + target;
+        }
+
+        std::cout << "\nBuilding Verilator targets...\n";
+        if (int exit_code = executeCommand(bazel_command); exit_code != 0) {
+            std::cerr << "Error: Bazel build failed with exit code " << exit_code << "\n";
+            return;
+        }
+        std::cout << "Build completed successfully.\n";
     }
 }
 
@@ -93,7 +132,7 @@ int main(int argc, char* argv[]) {
     if (command == "--init") {
         try {
             std::filesystem::path current_dir = std::filesystem::current_path();
-            BuildGenerator<std::filesystem::path>::initWorkspace(current_dir.string());
+            BuildGenerator::initWorkspace(current_dir.string());
             return 0;
         } catch (const std::exception& e) {
             std::cerr << "Error initializing workspace: " << e.what() << "\n";
