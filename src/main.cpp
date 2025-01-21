@@ -7,27 +7,29 @@
 #include <cstdio>
 #include "BuildGenerator.hpp"
 
+namespace {
+    // Execute a shell command and return its exit code
+    int executeCommand(const std::string& command) {
+        std::cout << "Executing: " << command << "\n";
+        return std::system(command.c_str());
+    }
+}
+
 void printUsage() {
     std::cout << "Usage: vpm [options] [files...]\n"
               << "Options:\n"
               << "  --init                            Initialize Bazel workspace\n"
               << "  --build <file1.sv> [file2.sv ...]  Build specified SystemVerilog files\n"
-              << "  --test <file.sv> <test.sv>         Build with test file\n"
+              << "  --test <file.sv> <test.cpp>        Build with test file\n"
               << "  --help                             Display this help message\n";
 }
 
-bool hasValidExtension(const std::string& filename) {
-    const std::string extension = ".sv";
+bool hasValidExtension(const std::string& filename, bool is_test_file = false) {
+    const std::string extension = is_test_file ? ".cpp" : ".sv";
     if (filename.length() < extension.length()) {
         return false;
     }
     return filename.substr(filename.length() - extension.length()) == extension;
-}
-
-// Execute a shell command and return its exit code
-int executeCommand(const std::string& command) {
-    std::cout << "Executing: " << command << "\n";
-    return std::system(command.c_str());
 }
 
 void buildFiles(const std::vector<std::string>& files, const std::optional<std::string>& test_file = std::nullopt) {
@@ -45,8 +47,8 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
         }
     }
 
-    if (test_file && !hasValidExtension(*test_file)) {
-        std::cout << "Error: Test file '" << *test_file << "' does not have .sv extension\n";
+    if (test_file && !hasValidExtension(*test_file, true)) {
+        std::cout << "Error: Test file '" << *test_file << "' does not have .cpp extension\n";
         hasInvalidFiles = true;
     }
 
@@ -85,13 +87,15 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
             // Add Bazel target for this file
             std::string module_name = file_path.stem().string();
             std::string target_path = std::filesystem::relative(dir_path).string();
-            std::string bazel_target = "//" + target_path + ":" + module_name + "_verilated";
-            bazel_targets.push_back(bazel_target);
-
-            // If test file is provided, add test target
+            
             if (test_file) {
+                // For test mode, we only need the test target
                 std::string test_target = "//" + target_path + ":" + module_name + "_test";
                 bazel_targets.push_back(test_target);
+            } else {
+                // For build mode, we need the verilated target
+                std::string bazel_target = "//" + target_path + ":" + module_name + "_verilated";
+                bazel_targets.push_back(bazel_target);
             }
 
         } catch (const std::exception& e) {
@@ -102,7 +106,7 @@ void buildFiles(const std::vector<std::string>& files, const std::optional<std::
 
     // Build all targets with Bazel
     if (!bazel_targets.empty()) {
-        std::string bazel_command = "bazel build";
+        std::string bazel_command = test_file ? "bazel test" : "bazel build";
         for (const auto& target : bazel_targets) {
             bazel_command += " " + target;
         }

@@ -6,13 +6,13 @@ def _verilator_hdl_library_impl(ctx):
     verilate_action = ctx.actions.declare_file(ctx.attr.name + "_verilate.sh")
     ctx.actions.write(
         output = verilate_action,
-        content = """#!/bin/bash
-        set -e
-        mkdir -p {output_dir}
-        {verilator} --cc {input} --Mdir {output_dir}
-        rm -f {output_dir}/*.mk {output_dir}/*.dat {output_dir}/*.d
-        """.format(
-            verilator = ctx.executable._verilator.path,
+        content = '''\
+#!/bin/bash
+set -e
+mkdir -p {output_dir}
+/usr/local/bin/verilator --cc {input} --Mdir {output_dir}
+rm -f {output_dir}/*.mk {output_dir}/*.dat {output_dir}/*.d
+'''.format(
             input = ctx.file.src.path,
             output_dir = output_dir.path,
         ),
@@ -22,7 +22,7 @@ def _verilator_hdl_library_impl(ctx):
     ctx.actions.run(
         outputs = [output_dir],
         inputs = [ctx.file.src],
-        tools = [ctx.executable._verilator, verilate_action],
+        tools = [verilate_action],
         executable = verilate_action,
         mnemonic = "Verilate",
     )
@@ -43,11 +43,6 @@ verilator_hdl_library = rule(
         "src": attr.label(
             allow_single_file = [".v", ".sv"],
             mandatory = True,
-        ),
-        "_verilator": attr.label(
-            default = "@system_verilator//:verilator_bin",
-            executable = True,
-            cfg = "exec",
         ),
     },
     fragments = ["cpp"],

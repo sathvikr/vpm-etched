@@ -1,6 +1,7 @@
 workspace(name = "verilog_workspace")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 # C++ rules (needed for Verilator)
 http_archive(
@@ -10,30 +11,25 @@ http_archive(
     sha256 = "2037875b9a4456dce4a79d112a8ae885bbc4aad968e6587dca6e64f3a0900cdf",
 )
 
-# Local toolchain configuration
-new_local_repository(
-    name = "system_verilator",
-    path = "/usr/local",  # Typical installation path for Verilator
-    build_file_content = """
-cc_library(
-    name = "verilator",
-    srcs = glob(["lib/libverilator.*"]),
-    hdrs = glob([
-        "include/verilator/**/*.h",
-        "share/verilator/include/**/*.h",
-        "share/verilator/include/**/*.cpp",
-    ]),
-    includes = [
-        "include",
-        "share/verilator/include",
-    ],
-    visibility = ["//visibility:public"],
+# Google Test
+http_archive(
+    name = "gtest",
+    urls = ["https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz"],
+    strip_prefix = "googletest-1.14.0",
+    sha256 = "8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
 )
 
-filegroup(
-    name = "verilator_bin",
-    srcs = ["bin/verilator"],
+# Local Verilator configuration
+new_local_repository(
+    name = "verilator",
+    path = "/usr/local/Cellar/verilator/5.026",
+    build_file_content = """
+cc_library(
+    name = "verilator_runtime",
+    srcs = glob(["share/verilator/include/*.cpp"]),
+    hdrs = glob(["share/verilator/include/*.h"]),
+    strip_include_prefix = "share/verilator/include",
     visibility = ["//visibility:public"],
 )
-"""
+""",
 )

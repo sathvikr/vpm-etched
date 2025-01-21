@@ -16,6 +16,12 @@ private:
     
     // Extracts submodule names from SystemVerilog file
     void parseSubmodules();
+    
+    // Generate a regular BUILD file for the SystemVerilog module
+    void generateRegularBuildFile(std::ofstream& build_file, const std::string& module_name, const std::filesystem::path& output_path);
+    
+    // Generate a BUILD file for testing with Verilator testbench
+    void generateTestBuildFile(std::ofstream& build_file, const std::string& module_name, const std::filesystem::path& output_path);
 
 public:
     // Initialize workspace with necessary Bazel dependencies
@@ -24,7 +30,7 @@ public:
     explicit BuildGenerator(const std::filesystem::path& path, 
                           const std::optional<std::filesystem::path>& test_path = std::nullopt);
 
-    // Generate Bazel BUILD file
+    // Generate appropriate Bazel BUILD file based on whether it's a test or not
     void generateBuildFile(const std::string& output_path);
 
     // Get list of parsed submodules
