@@ -1,0 +1,3 @@
+[submodule "nextpnr-xilinx"]
+	path = nextpnr-xilinx
+	url = https://github.com/gatecat/nextpnr-xilinx.git

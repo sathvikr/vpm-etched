@@ -12,7 +12,11 @@ def _verilator_hdl_test_impl(ctx):
         output = verilate_action,
         content = '''\
 #!/bin/bash
-set -e
+set -ex
+echo "Current directory: $(pwd)"
+echo "Output directory: {output_dir}"
+echo "Output executable: {exe}"
+echo "Test log: {test_log}"
 
 # Convert relative paths to absolute
 WORKSPACE_ROOT=$(pwd)
@@ -20,72 +24,95 @@ OUTPUT_DIR="$WORKSPACE_ROOT/{output_dir}"
 OUTPUT_EXE="$WORKSPACE_ROOT/{exe}"
 TEST_LOG="$WORKSPACE_ROOT/{test_log}"
 
-mkdir -p "$OUTPUT_DIR" > /dev/null 2>&1
-cp {input} "$OUTPUT_DIR"/ > /dev/null 2>&1
-cp {testbench} "$OUTPUT_DIR"/ > /dev/null 2>&1
-cd "$OUTPUT_DIR" > /dev/null 2>&1
+mkdir -p "$OUTPUT_DIR"
+cp {input} "$OUTPUT_DIR"/
+cp {testbench} "$OUTPUT_DIR"/
+cd "$OUTPUT_DIR"
+
+echo "Changed to directory: $(pwd)"
+ls -la
 
 # Get Verilator include path
 VERILATOR_ROOT=/usr/local/Cellar/verilator/5.026/share/verilator
 
-/usr/local/bin/verilator --cc --exe --trace {input_name} {testbench_name} \
-    --Mdir . --prefix V{top_name} \
-    --top-module {top_name} \
-    -CFLAGS "-I. -I/usr/local/include -I$VERILATOR_ROOT/include -I/usr/local/include/gtest -std=c++17" > /dev/null 2>&1
+/usr/local/bin/verilator --cc --exe --trace {input_name} {testbench_name} \\
+    --Mdir . --prefix V{top_name} \\
+    --top-module {top_name} \\
+    -CFLAGS "-I. -I/usr/local/include -I$VERILATOR_ROOT/include -I/usr/local/include/gtest -std=c++17"
 
-sed -i.bak 's|#include "test/rtl/V{top_name}.h"|#include "V{top_name}.h"|' {testbench_name} > /dev/null 2>&1
+sed -i.bak 's|#include "test/rtl/V{top_name}.h"|#include "V{top_name}.h"|' {testbench_name}
 
+echo "Compiling Verilator runtime..."
 # Compile Verilator runtime
-c++ -c -I. -I$VERILATOR_ROOT/include -std=c++17 \
-    $VERILATOR_ROOT/include/verilated.cpp \
-    $VERILATOR_ROOT/include/verilated_vcd_c.cpp \
-    $VERILATOR_ROOT/include/verilated_threads.cpp > /dev/null 2>&1
+c++ -c -I. -I$VERILATOR_ROOT/include -std=c++17 \\
+    $VERILATOR_ROOT/include/verilated.cpp \\
+    $VERILATOR_ROOT/include/verilated_vcd_c.cpp \\
+    $VERILATOR_ROOT/include/verilated_threads.cpp
 
 # Create archive
-ar rvs libverilated.a verilated.o verilated_vcd_c.o verilated_threads.o > /dev/null 2>&1
+ar rvs libverilated.a verilated.o verilated_vcd_c.o verilated_threads.o
 
+echo "Compiling generated Verilator files..."
 # Compile the generated Verilator files
-c++ -c -I. -I$VERILATOR_ROOT/include -I/usr/local/include \
-    -std=c++17 -Os \
-    -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=1 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=1 \
-    Vcounter.cpp \
-    Vcounter___024root__DepSet_h0dd033c2__0.cpp \
-    Vcounter___024root__DepSet_h5086c508__0.cpp \
-    Vcounter__Trace__0.cpp \
-    Vcounter___024root__Slow.cpp \
-    Vcounter___024root__DepSet_h5086c508__0__Slow.cpp \
-    Vcounter__Syms.cpp \
-    Vcounter__Trace__0__Slow.cpp \
-    Vcounter__TraceDecls__0__Slow.cpp > /dev/null 2>&1
+c++ -c -I. -I$VERILATOR_ROOT/include -I/usr/local/include \\
+    -std=c++17 -Os \\
+    -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=1 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=1 \\
+    Vcounter.cpp \\
+    Vcounter___024root__DepSet_h0dd033c2__0.cpp \\
+    Vcounter___024root__DepSet_h5086c508__0.cpp \\
+    Vcounter__Trace__0.cpp \\
+    Vcounter___024root__Slow.cpp \\
+    Vcounter___024root__DepSet_h5086c508__0__Slow.cpp \\
+    Vcounter__Syms.cpp \\
+    Vcounter__Trace__0__Slow.cpp \\
+    Vcounter__TraceDecls__0__Slow.cpp
 
+echo "Compiling test..."
 # Compile the test
-c++ -c -I. -I$VERILATOR_ROOT/include -I/usr/local/include \
-    -std=c++17 -Os \
-    -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=1 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=1 \
-    counter_tb.cpp > /dev/null 2>&1
+c++ -c -I. -I$VERILATOR_ROOT/include -I/usr/local/include \\
+    -std=c++17 -Os \\
+    -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=1 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=1 \\
+    counter_tb.cpp
 
-mkdir -p $(dirname "$OUTPUT_EXE") > /dev/null 2>&1
+echo "Creating output directory and linking..."
+# Create output directory and link everything together
+mkdir -p $(dirname "$OUTPUT_EXE")
+echo "Output directory created: $(ls -la $(dirname "$OUTPUT_EXE"))"
 
-c++ -o counter_hdl_test \
-    counter_tb.o \
-    Vcounter.o \
-    Vcounter___024root__DepSet_h0dd033c2__0.o \
-    Vcounter___024root__DepSet_h5086c508__0.o \
-    Vcounter__Trace__0.o \
-    Vcounter___024root__Slow.o \
-    Vcounter___024root__DepSet_h5086c508__0__Slow.o \
-    Vcounter__Syms.o \
-    Vcounter__Trace__0__Slow.o \
-    Vcounter__TraceDecls__0__Slow.o \
-    -L/usr/local/lib -L. \
-    -lpthread -lverilated \
-    -lgtest -lgtest_main > /dev/null 2>&1
+echo "Linking with debug output..."
+c++ -v -o counter_hdl_test \\
+    counter_tb.o \\
+    Vcounter.o \\
+    Vcounter___024root__DepSet_h0dd033c2__0.o \\
+    Vcounter___024root__DepSet_h5086c508__0.o \\
+    Vcounter__Trace__0.o \\
+    Vcounter___024root__Slow.o \\
+    Vcounter___024root__DepSet_h5086c508__0__Slow.o \\
+    Vcounter__Syms.o \\
+    Vcounter__Trace__0__Slow.o \\
+    Vcounter__TraceDecls__0__Slow.o \\
+    -L/usr/local/lib -L. \\
+    -lpthread -lverilated \\
+    -lgtest -lgtest_main
 
-cp counter_hdl_test "$OUTPUT_EXE" > /dev/null 2>&1
+cp counter_hdl_test "$OUTPUT_EXE"
+echo "Final output: $(ls -la "$OUTPUT_EXE")"
+
+# Test the executable
+echo "Testing executable..."
+ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
 
 # Run the test and capture output
+echo "Running test..."
+set +e  # Don't exit on error
 "$OUTPUT_EXE" 2>&1 | tee "$TEST_LOG"
 test_exit=$?
+set -e  # Re-enable exit on error
+
+# Print test log
+echo "=== Test Log ==="
+cat "$TEST_LOG"
+echo "=== End Test Log ==="
 
 exit $test_exit
 '''.format(
