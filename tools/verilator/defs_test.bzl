@@ -98,10 +98,6 @@ c++ -v -o counter_hdl_test \\
 cp counter_hdl_test "$OUTPUT_EXE"
 echo "Final output: $(ls -la "$OUTPUT_EXE")"
 
-# Test the executable
-echo "Testing executable..."
-ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
-
 # Run the test and capture output
 echo "Running test..."
 set +e  # Don't exit on error

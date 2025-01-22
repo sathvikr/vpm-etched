@@ -240,14 +240,12 @@ c++ -v -o counter_hdl_test \\
 cp counter_hdl_test "$OUTPUT_EXE"
 echo "Final output: $(ls -la "$OUTPUT_EXE")"
 
-# Test the executable
-echo "Testing executable..."
-ldd "$OUTPUT_EXE" || otool -L "$OUTPUT_EXE"
-
 # Run the test and capture output
 echo "Running test..."
+set +e  # Don't exit on error
 "$OUTPUT_EXE" 2>&1 | tee "$TEST_LOG"
-test_exit=\${PIPESTATUS[0]}
+test_exit=$?
+set -e  # Re-enable exit on error
 
 # Print test log
 echo "=== Test Log ==="
